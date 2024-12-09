@@ -53,7 +53,7 @@ InsMem::InsMem(MemType::Type type, path ioDir) : id(type), ioDir(ioDir)
 	}
 	catch (const exception &e)
 	{
-		throw runtime_error("An error occurred in InsMem constructor: " + string(e.what()));
+		throw runtime_error("In InsMem constructor: " + string(e.what()));
 	}
 }
 
@@ -108,7 +108,7 @@ DataMem::DataMem(MemType::Type type, path ioDir) : id{type}, ioDir{ioDir}
 	}
 	catch (const exception &e)
 	{
-		throw runtime_error("An error occurred in DataMem constructor: " + string(e.what()));
+		throw runtime_error("In DataMem constructor: " + string(e.what()));
 	}
 }
 
@@ -294,7 +294,7 @@ void RegisterFile::outputRF(int cycle)
 	}
 	catch (const exception &e)
 	{
-		throw runtime_error("An error occurred in RegisterFile::outputRF: " + string(e.what()));
+		throw runtime_error("In RegisterFile::outputRF: " + string(e.what()));
 	}
 }
 

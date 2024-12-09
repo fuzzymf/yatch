@@ -389,7 +389,7 @@ void SingleStageCore::step()
 	}
 	catch (const exception &e)
 	{
-		throw runtime_error("An error occurred in SingleStageCore::step: " + string(e.what()));
+		throw runtime_error("In SingleStageCore::step: " + string(e.what()));
 	}
 }
 
@@ -422,7 +422,7 @@ void SingleStageCore::printState(stateStruct state, int cycle) // A Debug functi
 	}
 	catch (const exception &e)
 	{
-		throw runtime_error("An error occurred in SingleStageCore::printState: " + string(e.what()));
+		throw runtime_error("In SingleStageCore::printState: " + string(e.what()));
 	}
 }
 
@@ -448,7 +448,7 @@ void SingleStageCore::printEvaluation(string ioDir) // A function to print the p
 	}
 	catch (const exception &e)
 	{
-		throw runtime_error("An error occurred in SingleStageCore::printEvaluation: " + string(e.what()));
+		throw runtime_error("In SingleStageCore::printEvaluation: " + string(e.what()));
 	}
 }
 
