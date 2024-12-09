@@ -262,80 +262,92 @@ void FiveStageCore::step()
 
 		// Decode instruction
 		uint32_t instr = instruction.to_ulong();
-		uint32_t opcode = instr & 0x7F;
-		uint32_t rd = (instr >> 7) & 0x1F;
-		uint32_t funct3 = (instr >> 12) & 0x7;
-		uint32_t rs1 = (instr >> 15) & 0x1F;
-		uint32_t rs2 = (instr >> 20) & 0x1F;
-		uint32_t funct7 = (instr >> 25) & 0x7F;
 
-		// Read registers
-		bitset<32> Read_data1 = myRF.readRF(rs1);
-		bitset<32> Read_data2 = myRF.readRF(rs2);
-
-		// Hazard Detection
-		bool stall = false;
-
-		// Check for RAW hazards with EX stage
-		if (state.EX.rd_mem && state.EX.Wrt_reg_addr.to_ulong() != 0) // checks if the instruction in EX stage is a load instr and that the writeback register is not x0
+		if (instr == 0xFFFFFFFF)
 		{
-			if (state.EX.Wrt_reg_addr.to_ulong() == rs1 || state.EX.Wrt_reg_addr.to_ulong() == rs2)
-				stall = true; // Stall required
-											// checks if the destination register of the instruction in EX stage is the source register of the instruction in ID
-											// If the dest. reg = = source reg,
-											// then there is a RAW hazard(Read after Write)
-											// The instruction tries to read the value before the value is written back
-		}
-		// Check for RAW hazards with EX stage
-		if (state.EX.wrt_enable && state.EX.Wrt_reg_addr.to_ulong() != 0)
-		{
-			if (state.EX.Wrt_reg_addr == rs1 || (!state.EX.is_I_type && state.EX.Wrt_reg_addr == rs2))
-			{
-				stall = true; // Stall required
-			}
-		}
-
-		if (stall)
-		{
-			// Insert stall
-			nextState.ID = state.ID; // Keep the instruction in ID stage
-			nextState.EX.nop = true; // Insert nop in EX stage
-			// IF stage also needs to stall
-			nextState.IF = state.IF;
-			// stall helps the EX stage to finish the operation before the ID stage reads the value
+			// HALT instruction encountered
+			state.IF.nop = true;		 // Stop fetching new instructions
+			nextState.IF.nop = true; // Stop fetching new instructions
 		}
 		else
 		{
-			// Prepare data for EX stage
-			nextState.EX.nop = false;
-			nextState.EX.Read_data1 = Read_data1;
-			nextState.EX.Read_data2 = Read_data2;
-			nextState.EX.Rs = rs1;
-			nextState.EX.Rt = rs2;
-			nextState.EX.Wrt_reg_addr = rd;
-			nextState.EX.Imm = bitset<32>(signExtendImmediate(instr));
-			nextState.EX.PC = state.ID.PC;
-			nextState.EX.opcode = opcode;
+			// Proceed with normal decoding and hazard detection
+			uint32_t opcode = instr & 0x7F;
+			cout << "opcode: " << opcode << endl;
+			uint32_t rd = (instr >> 7) & 0x1F;
+			uint32_t funct3 = (instr >> 12) & 0x7;
+			uint32_t rs1 = (instr >> 15) & 0x1F;
+			uint32_t rs2 = (instr >> 20) & 0x1F;
+			uint32_t funct7 = (instr >> 25) & 0x7F;
 
-			// Set control signals based on opcode
-			setControlSignals(opcode, funct3, funct7, nextState.EX);
+			// Read registers
+			bitset<32> Read_data1 = myRF.readRF(rs1);
+			bitset<32> Read_data2 = myRF.readRF(rs2);
 
-			// Branch Handling
-			if (opcode == 0x63) // Branch instructions
+			// Hazard Detection
+			bool stall = false;
+
+			// Check for RAW hazards with EX stage
+			if (state.EX.rd_mem && state.EX.Wrt_reg_addr.to_ulong() != 0) // checks if the instruction in EX stage is a load instr and that the writeback register is not x0
 			{
-				// Control Hazard Detection
-				bool branchTaken = evaluateBranch(funct3, Read_data1, Read_data2);
-				// checks if the branch condition is satisfied
-				if (branchTaken)
+				if (state.EX.Wrt_reg_addr.to_ulong() == rs1 || state.EX.Wrt_reg_addr.to_ulong() == rs2)
+					stall = true; // Stall required
+												// checks if the destination register of the instruction in EX stage is the source register of the instruction in ID
+												// If the dest. reg = = source reg,
+												// then there is a RAW hazard(Read after Write)
+												// The instruction tries to read the value before the value is written back
+			}
+			// Check for RAW hazards with EX stage
+			if (state.EX.wrt_enable && state.EX.Wrt_reg_addr.to_ulong() != 0)
+			{
+				if (state.EX.Wrt_reg_addr == rs1 || (!state.EX.is_I_type && state.EX.Wrt_reg_addr == rs2))
 				{
-					// Flush IF stage
-					nextState.IF.nop = true;
-					// this is done to prevent the instruction in the IF stage from being executed- preventing control hazards
-					// control hazards can also be prevented by stalling the pipeline, but branch prediction and flushing is more efficient
+					stall = true; // Stall required
+				}
+			}
 
-					// Update PC
-					int32_t imm = getBranchImmediate(instr);
-					nextState.IF.PC = bitset<32>(state.ID.PC.to_ulong() + imm);
+			if (stall)
+			{
+				// Insert stall
+				nextState.ID = state.ID; // Keep the instruction in ID stage
+				nextState.EX.nop = true; // Insert nop in EX stage
+				// IF stage also needs to stall
+				nextState.IF = state.IF;
+				// stall helps the EX stage to finish the operation before the ID stage reads the value
+			}
+			else
+			{
+				// Prepare data for EX stage
+				nextState.EX.nop = false;
+				nextState.EX.Read_data1 = Read_data1;
+				nextState.EX.Read_data2 = Read_data2;
+				nextState.EX.Rs = rs1;
+				nextState.EX.Rt = rs2;
+				nextState.EX.Wrt_reg_addr = rd;
+				nextState.EX.Imm = bitset<32>(signExtendImmediate(instr));
+				nextState.EX.PC = state.ID.PC;
+				nextState.EX.opcode = opcode;
+
+				// Set control signals based on opcode
+				setControlSignals(opcode, funct3, funct7, nextState.EX);
+
+				// Branch Handling
+				if (opcode == 0x63) // Branch instructions
+				{
+					// Control Hazard Detection
+					bool branchTaken = evaluateBranch(funct3, Read_data1, Read_data2);
+					// checks if the branch condition is satisfied
+					if (branchTaken)
+					{
+						// Flush IF stage
+						nextState.IF.nop = true;
+						// this is done to prevent the instruction in the IF stage from being executed- preventing control hazards
+						// control hazards can also be prevented by stalling the pipeline, but branch prediction and flushing is more efficient
+
+						// Update PC
+						int32_t imm = getBranchImmediate(instr);
+						nextState.IF.PC = bitset<32>(state.ID.PC.to_ulong() + imm);
+					}
 				}
 			}
 		}
@@ -421,8 +433,8 @@ void FiveStageCore::printState(stateStruct state, int cycle)
 		printstate << "WB.nop:\t" << state.WB.nop << endl;
 	}
 	else
-		cout << "Unable to open FS StateResult output file." << endl;
-	throw runtime_error("Unable to open FS StateResult output file.");
+		throw runtime_error("Unable to open FS StateResult output file.");
+
 	printstate.close();
 }
 
@@ -448,7 +460,7 @@ void FiveStageCore::printEvaluation(string ioDir)
 	}
 	catch (const exception &e)
 	{
-		throw runtime_error("An error occurred in SingleStageCore::printEvaluation: " + string(e.what()));
+		throw runtime_error("In SingleStageCore::printEvaluation: " + string(e.what()));
 	}
 }
 
